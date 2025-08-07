@@ -15,9 +15,15 @@
       Error rendering option.
     </div>
     <div v-if="args.rendering === 'unwrap'" class="zoom-controls">
-      <button class="zoom-button" @click.stop="toggleZoomPanel">
-        {{ Math.round(currentZoom * 100) }}%
-      </button>
+      <div class="top-buttons">
+        <button class="zoom-button" @click.stop="toggleFullscreen" title="Toggle Fullscreen">
+          <svg v-if="!isFullscreen" style="width:16px; height:16px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          <svg v-else style="width:16px; height:16px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+        </button>
+        <button class="zoom-button" @click.stop="toggleZoomPanel">
+          {{ Math.round(currentZoom * 100) }}%
+        </button>
+      </div>
       <div v-if="showZoomPanel" class="zoom-panel">
         <div class="zoom-input-container">
           <input 
@@ -82,6 +88,7 @@ export default {
     const loadedPages = ref([]);
     const currentFrameHeight = ref(props.args.height || 0);
     const showZoomPanel = ref(false);
+    const isFullscreen = ref(false);
     
     const initialZoom = props.args.zoom_level === null || props.args.zoom_level === undefined ? 'auto' : props.args.zoom_level;
     const localZoomLevel = ref(initialZoom);
@@ -354,7 +361,7 @@ export default {
       if (props.args.scroll_to_page) {
         const page = document.getElementById(`canvas_page_${props.args.scroll_to_page}`);
         if (page) {
-          page.scrollIntoView({ behavior: "smooth" });
+          page.scrollIntoView({ behavior: "instant", block: "nearest" });
         }
       } else if (props.args.scroll_to_annotation) {
         const annotation = document.querySelector(`[id^="annotation-"][data-index="${props.args.scroll_to_annotation}"]`);
@@ -416,6 +423,27 @@ export default {
         handleResize();
     });
 
+    const enterFullscreen = () => {
+      const el = pdfContainer.value;
+      if (el && el.requestFullscreen) {
+        el.requestFullscreen();
+      }
+    };
+
+    const exitFullscreen = () => {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    };
+
+    const toggleFullscreen = () => {
+      if (!isFullscreen.value) {
+        enterFullscreen();
+      } else {
+        exitFullscreen();
+      }
+    };
+
     const setZoom = (zoomLevel) => {
       localZoomLevel.value = zoomLevel;
       showZoomPanel.value = false;
@@ -470,17 +498,23 @@ export default {
       }
     };
 
+    const onFullscreenChange = () => {
+      isFullscreen.value = !!document.fullscreenElement;
+    };
+
     const debouncedHandleResize = debounce(handleResize, 200);
 
     onMounted(() => {
       debouncedHandleResize();
       window.addEventListener("resize", debouncedHandleResize);
       document.addEventListener('click', handleClickOutside);
+      document.addEventListener('fullscreenchange', onFullscreenChange);
     });
 
     onUnmounted(() => {
       window.removeEventListener("resize", debouncedHandleResize);
       document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
     });
 
     return {
@@ -498,6 +532,8 @@ export default {
       fitToHeight,
       toggleZoomPanel,
       applyManualZoom,
+      isFullscreen,
+      toggleFullscreen,
     };
   },
 };
@@ -521,6 +557,12 @@ export default {
   align-items: flex-end;
 }
 
+.top-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .zoom-button {
   background: rgba(40, 40, 40, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -532,7 +574,7 @@ export default {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   font-weight: 500;
   transition: background 0.2s;
-  margin-bottom: 8px;
+  /* margin-bottom: 8px; */
 }
 
 .zoom-button:hover {
